@@ -27,7 +27,7 @@ numjobs=1
 iodepth=128
 time_based
 ramp_time=60
-runtime=1200
+runtime=3600
 
 [seq_read_128K_qd128_1job]
 stonewall
@@ -38,7 +38,7 @@ numjobs=1
 iodepth=128
 time_based
 ramp_time=60
-runtime=1200
+runtime=3600
 
 [precondition_rand_write_j4_8k_q64]
 stonewall
@@ -62,7 +62,7 @@ numjobs=8
 iodepth=32
 time_based
 ramp_time=60
-runtime=1200
+runtime=3600
 
 [randrw_qd32_j8]
 stonewall
@@ -75,7 +75,7 @@ numjobs=8
 iodepth=32
 time_based
 ramp_time=60
-runtime=1200
+runtime=3600
 
 [randread_qd32_j8]
 stonewall
@@ -87,4 +87,4 @@ numjobs=8
 iodepth=32
 time_based
 ramp_time=60
-runtime=1200
+runtime=3600
