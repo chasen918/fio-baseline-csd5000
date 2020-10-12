@@ -24,7 +24,10 @@ pid_list=""
 for disk in ${disks[@]};
 do
     iostat -dxmct 1 ${disk} > ${timestamp}/${disk}.iostat &
-    fio --filename=/dev/${disk} --output=${timestamp}/${disk}_fio.log ./baseline.fio &
+    fio "${comp_opt_str}" \
+        --filename=/dev/${disk} \
+        --output=${timestamp}/${disk}.fio \
+        ./baseline.fio &
     pid_list="${pid_list} $!"
 done
 
