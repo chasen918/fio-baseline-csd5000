@@ -33,3 +33,19 @@ done
 
 wait ${pid_list}
 pkill -9 iostat
+
+pushd ${timestamp}
+iofields="1,4-9,14"
+cpufields="1-2,4"
+for fiostat in `ls *.iostat`
+do
+    grep -m1 Device $fiostat | sed -r "s/\s+/,/g" | cut -d, -f ${iofields} > ${fiostat}_io.csv
+    grep -e sfd -e nvme $fiostat | sed -r "s/\s+/,/g"  | cut -d, -f ${iofields} >> ${fiostat}_io.csv
+
+    grep -m1 avg-cpu $fiostat | sed -r "s/\s+/,/g" | cut -d, -f ${cpufields} > ${fiostat}_cpu.csv
+    grep -A1 avg-cpu $fiostat | grep -v \- | sed -r "s/\s+/,/g" | cut -d, -f ${cpufields} >> ${fiostat}_cpu.csv
+    
+    paste -d, ${fiostat}_io.csv ${fiostat}_cpu.csv > ${fiostat}.csv
+    rm ${fiostat}_io.csv ${fiostat}_cpu.csv
+done
+popd

@@ -47,7 +47,7 @@ size=100%
 rw=randrw
 rwmixread=0
 bs=4k
-numjobs=8
+numjobs=4
 iodepth=64
 loops=1
 
