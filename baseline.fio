@@ -6,7 +6,7 @@ thread
 group_reporting
 name=baseline
 
-[precondition_seq_write_j1_128k_q256]
+[precondition_seqwrite_j1_128k_q256]
 stonewall
 new_group
 fill_device=1
@@ -17,7 +17,7 @@ numjobs=1
 iodepth=256
 loops=2
 
-[seq_write_128K_qd128_1job]
+[seqwrite_j1_128K_qd128]
 stonewall
 new_group
 size=100%
@@ -29,7 +29,7 @@ time_based
 ramp_time=60
 runtime=3600
 
-[seq_read_128K_qd128_1job]
+[seqread_j1_128K_qd128]
 stonewall
 size=100%
 bs=128k
@@ -40,7 +40,7 @@ time_based
 ramp_time=60
 runtime=3600
 
-[precondition_rand_write_j4_8k_q64]
+[precondition_randwrite_j4_4k_q128]
 stonewall
 new_group
 size=100%
@@ -48,10 +48,10 @@ rw=randrw
 rwmixread=0
 bs=4k
 numjobs=4
-iodepth=64
+iodepth=128
 loops=1
 
-[randwrite_qd32_j8]
+[randwrite_j8_4k_qd128]
 stonewall
 new_group
 size=100%
@@ -59,12 +59,12 @@ bs=4k
 rw=randrw
 rwmixread=0
 numjobs=8
-iodepth=32
+iodepth=128
 time_based
 ramp_time=60
 runtime=3600
 
-[randrw_qd32_j8]
+[randrw_j8_4k_qd128]
 stonewall
 new_group
 size=100%
@@ -72,19 +72,19 @@ bs=4k
 rw=randrw
 rwmixread=70
 numjobs=8
-iodepth=32
+iodepth=128
 time_based
 ramp_time=60
 runtime=3600
 
-[randread_qd32_j8]
+[randread_j8_4k_qd1288]
 stonewall
 new_group
 size=100%
 bs=4k
 rw=randread
 numjobs=8
-iodepth=32
+iodepth=128
 time_based
 ramp_time=60
 runtime=3600
