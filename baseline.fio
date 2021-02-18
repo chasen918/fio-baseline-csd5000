@@ -77,7 +77,7 @@ time_based
 ramp_time=60
 runtime=3600
 
-[randread_j8_4k_qd1288]
+[randread_j8_4k_qd128]
 stonewall
 new_group
 size=100%
