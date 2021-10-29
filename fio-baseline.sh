@@ -48,4 +48,25 @@ do
     paste -d, ${fiostat}_io.csv ${fiostat}_cpu.csv > ${fiostat}.csv
     rm ${fiostat}_io.csv ${fiostat}_cpu.csv
 done
+
+for f in `ls *.fio`
+do
+    disk_name=${f/.fio}
+    io_pattern=${disk_name}_io_pattern.csv
+    bw_iops_csv=${disk_name}_bw_iops.csv
+    lat_csv=${disk_name}_lat.csv
+    report=${disk_name}_sumary.csv
+
+    echo "pattern" > ${io_pattern}
+    grep -e pid= ${f} | sed -r -e "s/(randrw.*):.*\(.*/\1\n/g" -e "s/(.*):.*\(.*/\1/g" >> ${io_pattern}
+
+    echo "I/O,KIOPS,BW (MiB/s)" > ${bw_iops_csv}
+    grep -e BW= ${f} | sed -r -e "s/\s*(.*):\s*IOPS=([0-9\.k]+),\s*BW=([0-9\.]+MiB).*/\1,\2,\3/g" >> ${bw_iops_csv}
+
+    echo "lat unit,min,max,avg,stdev" > ${lat_csv}
+    grep -e "\slat\s.*avg=" ${f}  | sed -r -e "s/\s+(lat\s.*):\smin=\s*([0-9]+),\s+max=\s*([0-9]+),\s+avg=\s*([0-9\.]+),\sstdev=\s*([0-9\.]+).*/\1,\2,\3,\4,\5/g" >> ${lat_csv} 
+
+    paste -d, ${io_pattern} ${bw_iops_csv} ${lat_csv} > ${report}
+    rm ${io_pattern} ${bw_iops_csv} ${lat_csv}
+done
 popd
