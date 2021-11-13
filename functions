@@ -1,52 +1,101 @@
-#/bin/bash
+#/bin/bash -x
 
-function collect_sys_info() {
+function collect_sfdv_info() {
     drv_name=$1
     
-    echo ${drv_name} | grep /dev/
-    if [[ $? -ne 0 ]]; then local_drv=/dev/${drv_name}; else local_drv=drv_name; drv_name=${drv_name#/dev/}; fi
-
-    nvme_cli=nvme
-    smart_log_add=" intel "
-    if [[ "${drv_name::4}" == "sfdv" ]]; then nvme_cli=sfx-nvme; smart_log_add=" sfx "; fi
-    nvme_list=`${nvme_cli} list`
-    id_ctrl=`${nvme_cli} id-ctrl ${local_drv}`
-    smart_log=`${nvme_cli} smart-log ${local_drv}`
-    smart_log_add=`${nvme_cli} ${smart_log_add} smart-log-add ${local_drv}`
-    
-    echo "${nvme_list}"
+    echo "`sfx-status /dev/${drv_name}`"
     echo ""
-    echo "${id_ctrl}"
+    echo "`sfx-nvme smart-log /dev/${drv_name}`"
     echo ""
-    echo "${smart_log}"
+    echo "`sfx-nvme sfx smart-log-add /dev/${drv_name}`"
     echo ""
-    echo "${smart_log_add}"
-    echo ""
-    echo "`lscpu`"
-    echo ""
-    echo "`grep MHz /proc/cpuinfo`"
-    echo ""
-    echo "`free -m`"
+    echo "`grep . /sys/block/${drv_name}/queue/*`"
 }
 
+function collect_nvme_info() {
+    drv_name=$1
+    
+    echo "`nvme smart-log /dev/${drv_name}`"
+    echo ""
+    echo "`nvme intel smart-log-add /dev/${drv_name}`"
+    echo ""
+    echo "`grep . /sys/block/${drv_name}/queue/*`"
+}
+
+function collect_drv_info() {
+    drv_name=$1
+
+    if [[ `ls ${drv_name} 2>/dev/null` ]] || [[ `ls /dev/${drv_name} 2>/dev/null` ]]
+    then
+        if [[ `echo ${drv_name} | grep /dev/` ]]
+        then
+            drv_name=${drv_name#/dev/}
+        fi
+
+        if [[ "${drv_name::4}" == "sfdv" ]]
+        then
+            collect_sfdv_info ${drv_name}
+        fi
+
+        if [[ "${drv_name::4}" == "nvme" ]]
+        then
+            collect_nvme_info ${drv_name}
+        fi
+    fi
+}
+
+function collect_sys_info() {
+    echo -e "[memory]"
+    echo "`free -m`"
+    echo -e "\n[lsblk]"
+    echo "`lsblk`"
+    echo -e "\n[df]"
+    echo "`df -h`"
+    echo -e "\n[filesystem]"
+    echo "`mount`"
+    echo -e "\n[cpu]"
+    echo "`lscpu`"
+    echo "`grep MHz /proc/cpuinfo`"
+    echo -e "\n[sfdv_param]"
+    echo "`grep . /sys/module/sfxv_bd_dev/parameters/* 2>/dev/null`"
+    echo -e "\n[lspci]"
+    echo "$(for dev in `lspci | grep -i 'Non-Volatile' | cut -d' ' -f1`; do lspci -s $dev -vvv; done)"
+    echo -e "\n[dmidecode]"
+    echo "`dmidecode`"
+}
 
 function iostat_to_csv() {
     data_dir=$1
     if [[ ! -d ${data_dir} ]]; then return 1; fi
 
-    iofields="1,4-9,14"
-    cpufields="1-2,4"
+    iostat_ver=`iostat -V | grep -i version | cut -d" " -f3 | cut -d\. -f1`
+    if [[ ${iostat_ver} -lt 11 ]]
+    then
+        iofields="4-9,14"
+        cpufields="1-2,4"
+    else
+        iofields="2-5,12-14,16"
+        cpufields="1-2,4"
+    fi
+
     for fiostat in `ls ${data_dir}/*.iostat`
     do
         barename=${fiostat/*\/}; barename=${barename/.iostat}
-        grep -m1 Device $fiostat | sed -r "s/\s+/,/g" | cut -d, -f ${iofields} > ${data_dir}/${barename}.io
-        grep -e sfd -e nvme $fiostat | sed -r "s/\s+/,/g"  | cut -d, -f ${iofields} >> ${data_dir}/${barename}.io
+        ts=${data_dir}/${barename}.ts
+        io_out=${data_dir}/${barename}.io
+        cpu_out=${data_dir}/${barename}.cpu
 
-        grep -m1 avg-cpu $fiostat | sed -r "s/\s+/,/g" | cut -d, -f ${cpufields} > ${data_dir}/${barename}.cpu
-        grep -A1 avg-cpu $fiostat | grep -v \- | sed -r "s/\s+/,/g" | cut -d, -f ${cpufields} >> ${data_dir}/${barename}.cpu
+        echo "timestamp" > ${ts}
+        grep -E "[0-9]+:[0-9]+:" ${fiostat} >> ${ts}
+
+        grep -m1 Device ${fiostat} | sed -r "s/\s+/,/g" | cut -d, -f ${iofields} > ${io_out}
+        grep -e sfd -e nvme ${fiostat} | sed -r "s/\s+/,/g"  | cut -d, -f ${iofields} >> ${io_out}
+
+        grep -m1 avg-cpu ${fiostat} | sed -r "s/\s+/,/g" | cut -d, -f ${cpufields} > ${cpu_out}
+        grep -A1 avg-cpu ${fiostat} | grep -v \- | sed -r "s/\s+/,/g" | cut -d, -f ${cpufields} >> ${cpu_out}
         
-        paste -d, ${data_dir}/${barename}.io ${data_dir}/${barename}.cpu > ${data_dir}/${barename}.csv
-        rm -f ${data_dir}/${barename}.io ${data_dir}/${barename}.cpu
+        paste -d, ${ts} ${io_out} ${cpu_out} > ${data_dir}/${barename}.csv
+        rm -f ${ts} ${io_out} ${cpu_out}
     done
 }
 
@@ -114,6 +163,6 @@ function consolidate_summary() {
         result_list="${result_list} ${result}"
     done
 
-    paste -d, ${headers} ${result_list} > ${${out_dir}/result_summary.csv
+    paste -d, ${headers} ${result_list} > ${out_dir}/result_summary.csv
     rm ${headers} ${result_list}
 }
