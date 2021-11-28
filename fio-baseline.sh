@@ -6,13 +6,15 @@ my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 # example disks=(sfdv0n1 sfdv1n1 nvme0n1 nvme1n1)
 disks=(sfdv0n1)
 
-# another example to run test for even more disks
-#
+# #another example to run test for even more disks
+# #
+# disk=""
 # dev_prefix=sfdv
 # for i in {0..12}
 # do
 #     disks="${disks} ${dev_prefix}${i}n1"
 # done
+#
 
 # fio workloads
 workloads=(\
@@ -23,8 +25,9 @@ workloads=(\
     randwrite \
     randrw \
     randread \
+    precond_seq \
+    lat_read \
     lat_write \
-    lat_read\
     )
 
 # change the numbers below to control compressibility
