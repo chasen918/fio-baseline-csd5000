@@ -17,7 +17,7 @@ disks=(sfdv0n1)
 #
 
 # fio workloads
-workloads=(\
+workloads=( \
     precond_seq \
     seqwrite \
     seqread \
@@ -55,9 +55,11 @@ if [ ! -d "${output_dir}" ]; then mkdir -p ${output_dir}; fi
 iostat_dir=${output_dir}/iostat
 result_dir=${output_dir}/result
 drvinfo_dir=${output_dir}/drvinfo
+thermal_dir=${output_dir}/thermal
 mkdir -p ${iostat_dir}
 mkdir -p ${result_dir}
 mkdir -p ${drvinfo_dir}
+mkdir -p ${thermal_dir}
 
 source ${my_dir}/functions
 
@@ -70,19 +72,27 @@ done
 
 for workload in ${workloads[@]}
 do
-    pid_list=""
+    iostat_pid_list=""
+    thermal_pid_list=""
+    fio_pid_list=""
     for disk in ${disks[@]};
     do
         iostat -dxmct 1 ${disk} > ${iostat_dir}/${disk}_${workload}.iostat &
+        iostat_pid_list="${iostat_pid_list} $!"
+        ${my_dir}/record_thermal.sh /dev/${disk} ${thermal_dir}/${disk}_${workload}.thermal &
+        thermal_pid_list="${thermal_pid_list} $!"
+
         fio ${comp_opt_str} \
             --filename=/dev/${disk} \
             --output=${result_dir}/${disk}_${workload}.fio \
             ${my_dir}/jobs/${workload}.fio &
-        pid_list="${pid_list} $!"
+        fio_pid_list="${fio_pid_list} $!"
     done
 
-    wait ${pid_list}
-    pkill -9 iostat
+    wait ${fio_pid_list}
+    sync
+    kill -9 ${thermal_pid_list}
+    kill -9 ${iostat_pid_list}
 done
 
 for disk in ${disks[@]}
