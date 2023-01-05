@@ -6,12 +6,14 @@ thread
 group_reporting
 name=baseline
 
-[precondition_randwrite_4k_j4_q128]
+[precondition_randwrite_4k_j1_q128]
 stonewall
 size=100%
 rw=randrw
 rwmixread=0
 bs=4k
-numjobs=4
+numjobs=1
 iodepth=128
-loops=1
+loops=2
+norandommap=1
+randrepeat=0
