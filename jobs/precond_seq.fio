@@ -6,7 +6,7 @@ thread
 group_reporting
 name=baseline
 
-[precondition_seqwrite_128k_j1_q256]
+[precondition_seqwrite_128k_j1_q128]
 stonewall
 new_group
 fill_device=1
