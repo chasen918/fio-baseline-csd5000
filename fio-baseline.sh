@@ -16,6 +16,11 @@ disks=(sfdv0n1)
 # done
 #
 
+# cpus_allowed?，The number of CPU cores assigned to this parameter is the same as the maximum number of jobs in all I/O patterns. 
+# For details, see the description of the cpus_allowed option in the man fio help manual
+# example：_cpus_allowed=1,3,5,7,9
+_cpus_allowed=''
+
 # fio workloads
 workloads=( \
     precond_seq \
@@ -46,6 +51,13 @@ then
     comp_opt_str=" --buffer_compress_chunk=4k --buffer_compress_percentage=${comp_ratio} "
 else 
     comp_opt_str=""
+fi
+
+if [ "${_cpus_allowed}" != "" ]; 
+then
+    cpus_opt_str=" ${_cpus_allowed}"
+else
+    cpus_opt_str=""
 fi
 
 timestamp=`date +%Y%m%d_%H%M%S`
@@ -82,7 +94,7 @@ do
         ${my_dir}/record_thermal.sh /dev/${disk} ${thermal_dir}/${disk}_${workload}.thermal &
         thermal_pid_list="${thermal_pid_list} $!"
 
-        fio ${comp_opt_str} \
+        fio ${comp_opt_str} ${cpus_opt_str} \
             --filename=/dev/${disk} \
             --output=${result_dir}/${disk}_${workload}.fio \
             ${my_dir}/jobs/${workload}.fio &
