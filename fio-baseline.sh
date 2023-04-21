@@ -3,8 +3,8 @@
 my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 # put device name here to run fio test for 
 # multiple disks in parallel
-# example disks=(sfdv0n1 sfdv1n1 nvme0n1 nvme1n1)
-disks=(sfdv0n1)
+# example disks=(nvme0n1 nvme1n1 nvme2n1 nvme3n1)
+disks=(nvme0n1)
 
 # #another example to run test for even more disks
 # #
