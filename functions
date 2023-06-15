@@ -32,12 +32,11 @@ function collect_drv_info() {
             drv_name=${drv_name#/dev/}
         fi
 
-        if [[ "${drv_name::4}" == "sfdv" ]]
+        if [[ "${drv_name::4}" == "sfdv" ]] || nvme list |grep -i ${drv_name} |grep -iE 'ScaleFlux|CSD' &> /dev/null;
         then
             collect_sfdv_info ${drv_name}
-        fi
 
-        if [[ "${drv_name::4}" == "nvme" ]]
+        elif [[ "${drv_name::4}" == "nvme" ]];
         then
             collect_nvme_info ${drv_name}
         fi
