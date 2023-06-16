@@ -169,8 +169,10 @@ function consolidate_summary() {
 function collect_temperature() {
     dev_name=$1
 
-    if [[ "${drv_name::4}" == "sfdv" ]] || nvme list |grep -i ${drv_name} |grep -iE 'ScaleFlux|CSD' &> /dev/null;then
+    if [[ "${drv_name::4}" == "sfdv" ]];then
         echo `sfx-nvme smart-log ${dev_name} | grep -e sfdv -e temperature | sed -r -e "s/.*:(sfdv[0-9]+n1).*/\1/g" -e "s/.*: ([1-9]+) C.*/\1/g"` | sed -r "s/\s+/,/g"
+    elif nvme list |grep -i ${drv_name} |grep -iE 'ScaleFlux|CSD' &> /dev/null;then
+        echo `sfx-nvme smart-log ${dev_name} | grep -e nvme -e temperature | sed -r -e "s/.*:(nvme[0-9]+n1).*/\1/g" -e "s/.*: ([1-9]+) C.*/\1/g"` | sed -r "s/\s+/,/g"
     else
         echo `nvme smart-log ${dev_name} | grep -e nvme -e temperature | sed -r -e "s/.*:(nvme[0-9]+n1).*/\1/g" -e "s/.*: ([1-9]+) C.*/\1/g"` | sed -r "s/\s+/,/g"
     fi
