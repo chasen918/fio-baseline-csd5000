@@ -8,7 +8,7 @@ name=baseline
 
 [seqwrite_128K_j1_qd128]
 stonewall
-size=100%
+size=${run_size}
 bs=128K
 rw=write
 numjobs=1
