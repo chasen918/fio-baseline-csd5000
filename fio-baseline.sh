@@ -37,7 +37,7 @@ workloads=( \
 
 run_size="100%"
 comp_ratio=54
-runtime=60
+runtime=180
 
 export run_size="${run_size-100%}"
 
