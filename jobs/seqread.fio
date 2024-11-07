@@ -8,7 +8,7 @@ name=baseline
 
 [seqread_128K_j1_qd128]
 stonewall
-size=100%
+size=${run_size}
 bs=128k
 rw=read
 numjobs=1
