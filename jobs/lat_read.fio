@@ -8,7 +8,7 @@ name=baseline
 
 [randread_4k_j1_qd1]
 stonewall
-size=100%
+size=${run_size}
 bs=4k
 rw=randread
 numjobs=1
