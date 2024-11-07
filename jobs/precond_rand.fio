@@ -8,7 +8,7 @@ name=baseline
 
 [precondition_randwrite_4k_j1_q128]
 stonewall
-size=100%
+size=${run_size}
 rw=randrw
 rwmixread=0
 bs=4k
