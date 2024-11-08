@@ -6,7 +6,7 @@ thread
 group_reporting
 name=baseline
 
-[randrw_4k_j4_qd128]
+[randrw_4k_j4_qd64]
 stonewall
 size=${run_size}
 bs=4k
