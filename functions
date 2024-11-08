@@ -7,7 +7,7 @@ function collect_sfdv_info() {
     echo ""
     echo "`sfx-nvme sfx smart-log-add /dev/${drv_name}`"
     echo ""
-    echo "`grep . /sys/block/${drv_name}/queue/*`"
+    echo "`grep . /sys/block/${drv_name}/queue/* 2> /dev/null`"
 }
 
 function collect_nvme_info() {
