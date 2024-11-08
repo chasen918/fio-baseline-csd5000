@@ -13,7 +13,7 @@ bs=4k
 rw=randrw
 rwmixread=70
 numjobs=4
-iodepth=128
+iodepth=64
 time_based
 ramp_time=${ramp_time}
 runtime=${runtime}
