@@ -80,6 +80,7 @@ mkdir -p ${drvinfo_dir}
 mkdir -p ${thermal_dir}
 
 source ${my_dir}/functions
+chmod +x ${my_dir}/record_thermal.sh
 
 collect_sys_info > ${output_dir}/sysinfo.log
 
