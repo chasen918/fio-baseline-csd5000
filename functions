@@ -15,7 +15,7 @@ function collect_nvme_info() {
     
     echo "`nvme smart-log /dev/${drv_name}`"
     echo ""
-    echo "`grep . /sys/block/${drv_name}/queue/*`"
+    echo "`grep . /sys/block/${drv_name}/queue/* 2> /dev/null`"
 }
 
 function collect_drv_info() {
