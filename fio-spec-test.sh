@@ -2,13 +2,13 @@
 
 #========================Setting========================#
 # example disks=(nvme0n1 nvme1n1 nvme2n1 nvme3n1)
-disks=(nvme0n1 nvme1n1)
+disks=(nvme0n1)
 
 # set compression
-comp_ratio=55
+comp_ratio=0
 
 # set runtime
-runtime=60
+runtime=600
 
 # set ramp_time
 ramp_time=60
