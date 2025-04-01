@@ -5,7 +5,7 @@
 disks=(nvme0n1)
 
 # set compression
-comp_ratio=0
+comp_ratio=55
 
 # set runtime
 runtime=600
