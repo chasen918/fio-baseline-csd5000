@@ -20,9 +20,9 @@ cpus_allowed_list=()
 
 
 
-#=====#
+#=======================================================#
 # !!!Do Not Modify Codes Below!!!
-#=====#
+#=======================================================#
 if [ "$EUID" -ne 0 ]; then
     echo "The script must be run as root"
     exit 1
@@ -120,7 +120,7 @@ function Run_test(){
     
     #Random write
     echo "[`date`] [5/9] [${disk}] Random write 4k 4job qd64 Start" >> ${test_log}
-    iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_4kB_random_write_4job_QD128.log &
+    iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_4kB_random_write_4job_QD64.log &
     iostat_pid=$!
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk --name=4kB_random_write_4job_QD64 --rw=randwrite --bs=4k --numjobs=4 --iodepth=64 --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_random_write.log
     kill $iostat_pid > /dev/null
@@ -147,7 +147,7 @@ function Run_test(){
 
     #Random read
     echo "[`date`] [8/9] [${disk}] Random read 4k 8job qd128 Start" >> ${test_log}
-    iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_4kB_random_read_4job_QD128.log &
+    iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_4kB_random_read_8job_QD128.log &
     iostat_pid=$!
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk --name=4kB_random_read_8job_QD128 --rw=randread --bs=4k --numjobs=8 --iodepth=128 --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_random_read.log
     kill $iostat_pid > /dev/null
