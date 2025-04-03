@@ -48,6 +48,15 @@ if [ ${cpus_allowed_list_length} -ne 0 ] && [ ${cpus_allowed_list_length} -ne ${
     exit 1
 fi
 
+# check device
+for ((i=0; i<$disks_length; i++)); do
+    ls /dev/${disks[$i]} > /dev/null
+    if [ $? != 0 ];then
+       echo "Check ${disks[$i]} is not exsit!"
+       exit 1
+    fi
+done
+
 my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 timestamp=`date +%Y%m%d_%H%M%S`
 output_dir=${my_dir}/${timestamp}
@@ -62,7 +71,7 @@ mkdir -p ${drv_info}
 sys_info_log=${output_dir}/sys_info.log
 test_log=${output_dir}/run_test.log
 result_csv_log=${result_dir}/result.csv
-echo "Disk,IO,BS,QD,Jobs,KIOPS,BW (MB/s),Latency,Unit" > $result_csv_log
+echo "Disk,IO,BS,QD,Jobs,KIOPS,BW (MB/s),Latency,Unit,99.99% Latency,Unit" > $result_csv_log
 collect_test_config $test_log $disks $comp_ratio $runtime $ramp_time $cpus_allowed_list
 
 collect_sys_info $sys_info_log
