@@ -91,6 +91,7 @@ for ((i=0; i<$disks_length; i++)); do
        exit 1
     fi
 done
+wait
 
 my_dir="$( cd "$( dirname "$0"  )" && pwd  )"
 if [ -z ${output_dir} ];then
@@ -109,8 +110,7 @@ mkdir -p ${drv_info}
 sys_info_log=${output_dir}/sys_info.log
 test_log=${output_dir}/run_test.log
 result_csv_log=${result_dir}/result.csv
-echo "Disk,Compress_Percentage,IO,BS,QD,Jobs,KIOPS,BandWidth,Unit,Latency,Unit,99% Latency,Unit,99.99% Latency,Unit" > $result_csv_log
-collect_test_config $test_log $disks $comp_ratio $runtime $ramp_time $skip_check $cpus_allowed_list 
+collect_test_config $test_log "${disks[*]}" $comp_ratio $runtime $ramp_time $skip_check "${cpus_allowed_list[*]}" 
 collect_sys_info $sys_info_log
 
 if [ "${comp_ratio}" != "" ]; 
@@ -133,6 +133,7 @@ for ((i=0; i<$disks_length; i++)); do
         fi
     fi
 done
+wait
 
 if (( $error_flag != 0 )); then
     while true; do
@@ -314,6 +315,3 @@ done
 
 wait
 echo -e "Spec test is done, see result at ${output_dir}"
-
-
-
