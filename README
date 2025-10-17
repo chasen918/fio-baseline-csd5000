@@ -8,3 +8,4 @@ Options:
   -b  CPU binding ranges (space-separated, must match device count)
   -f  Force skip device status check
   -o  Specify the name of output directrory (default to timestamp)
+  -h  Print usage
