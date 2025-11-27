@@ -1,6 +1,6 @@
 To execute the script, please run it in a bash environment using the ./ notation. Additionally, make sure you have installed the fio, iostat, and sfx-tools tools.
 
-Usage: ./fio-spec-test.sh -d "disk1 disk2 ..." -t runtime [-c comp_ratio] [-b "cpus1 cpus2 ..."] [-f] [-o result_name]
+Usage: ./fio-spec-test.sh -d "nvme0n1 nvme1n1 ..." -t runtime [-c comp_ratio] [-b "cpus1 cpus2 ..."] [-f] [-o result_name]
 Options:
   -d  Specify NVMe device names (required, space-separated, e.g. "nvme0n1 nvme1n1")
   -c  Compression ratio (default: 0)

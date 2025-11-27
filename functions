@@ -21,9 +21,17 @@ function collect_test_config(){
     echo "[Config] skip_check=$skip_check" >> $output_file
 }
 
+function print_log(){
+    local str=$1
+
+    echo "[`date`] $str"
+    echo "[`date`] $str" >> ${test_log}
+}
+
 function collect_sys_info(){
     sys_info_log=$1
 
+    date >> ${sys_info_log}
     hostnamectl >> ${sys_info_log}
     echo "" >> ${sys_info_log}
     nvme list >> ${sys_info_log}
@@ -42,7 +50,8 @@ function collect_sys_info(){
 
 function collect_drv_before_info()
 {
-    disk=$1
+    local disk=$1
+    local drv_info=$2
     drv_log=${drv_info}/${disk}_before.log
 
     sfx-status /dev/$disk > $drv_log
@@ -60,24 +69,37 @@ function collect_drv_before_info()
     echo "" >> $drv_log
 }
 
-function collect_drv_after_info()
+function start_monitor()
 {
-    disk=$1
-    drv_log=${drv_info}/${disk}_after.log
+    local disk=$1
+    local drv_info=$2
+    drv_log=${drv_info}/${disk}_monitor.log
+    (while true; do
+        echo "`date`" >> "$drv_log"
+        if ! sfx-status >> "$drv_log"; then
+            print_log "[Warning] monitor process starts failed, please check sfx-status!"
+            exit 1
+        fi
+        echo "" >> "$drv_log"
+        sleep 30 
+    done) &
+    
+    monitor_pid=$!
+    disown "$monitor_pid" 
+    echo "$monitor_pid" > ${drv_info}/${disk}_monitor_pid
+    return 0
+}
 
-    sfx-status /dev/$disk > $drv_log
-    echo "" >> $drv_log
-    nvme smart-log /dev/$disk >> $drv_log
-    echo "" >> $drv_log
-    sfx-nvme sfx smart-log-add /dev/$disk >> $drv_log
-    echo "" >> $drv_log
-    nvme id-ctrl /dev/$disk >> $drv_log
-    echo "" >> $drv_log
+function kill_monitor(){
+    local disk=$1
+    local drv_info=$2
+    pid_file=${drv_info}/${disk}_monitor_pid
 
-    ctlid=$(echo $disk | grep -oP 'e\K\d+(?=n)')
-    address=$(cat /sys/class/nvme/nvme$ctlid/address)
-    lspci -s $address -vvv >> $drv_log
-    echo "" >> $drv_log
+    if [[ -r "$pid_file" ]]; then
+        pid=$(cat "$pid_file" 2>/dev/null | tr -d '[:space:]')
+        kill -9 $pid 2> /dev/null
+        rm -f $pid_file
+    fi
 }
 
 function collect_fio_result()
@@ -89,7 +111,7 @@ function collect_fio_result()
     local is_precondition=$5
 
     if [ ! -s $output_file ];then
-        echo "Disk,Compress_Percentage,IO,BS,QD,Jobs,KIOPS,BandWidth,Unit,Latency,Unit,99% Latency,Unit,99.99% Latency,Unit" >> $output_file
+        echo "Disk,Compress_Percentage,IO,BS,QD,Jobs,IOPS,BandWidth,Unit,Latency,Unit,99% Latency,Unit,99.99% Latency,Unit" >> $output_file
     fi
 
     pattern=$(sed -n '1p' $result_file | grep -oP 'rw=\K[^,)]+')
@@ -102,11 +124,11 @@ function collect_fio_result()
         iops_line_num=$(cat $result_file | grep -En 'write:|read:' | cut -d: -f1)
         lat_line_num=$((iops_line_num + 3))
         lat_line_text=$(sed -n "${lat_line_num}p" $result_file)        
-        iops=$(echo $iops_line_text | grep -oP 'IOPS=\K[\d\.]+(?=k)')
+        iops=$(echo $iops_line_text | grep -oP '(?<=IOPS=)[^,]*')
         bw=$(echo $iops_line_text | sed -n 's/[^(]*(\([0-9.]\+\)\([^)]*\)).*/\1/p')
         bw_unit=$(echo $iops_line_text | sed -n 's/[^(]*([0-9.]\+\([^)]*\)).*/\1/p')
         unit=$(echo $lat_line_text | grep -oP 'lat \(\K[^)]+')
-        lat=$(echo $lat_line_text | grep -oP '(?<=avg=)\d+(?:\.\d+)?(?=,)')
+        lat=$(echo $lat_line_text | grep -oP '(?<=avg=)[^,]*')
         qos_lat_line_num=$((iops_line_num + 8))
         qos_lat_line_text=$(sed -n "${qos_lat_line_num}p" $result_file) 
         qos_99=$(echo $qos_lat_line_text | grep -oP '99\.0000000th=\[\s*\K\d+')
@@ -125,11 +147,11 @@ function collect_fio_result()
         iops_line_num=$(cat $result_file | grep -En 'read:' | cut -d: -f1)
         lat_line_num=$((iops_line_num + 3))
         lat_line_text=$(sed -n "${lat_line_num}p" $result_file)
-        iops=$(echo $iops_line_text | grep -oP 'IOPS=\K[\d\.]+(?=k)')
+        iops=$(echo $iops_line_text | grep -oP '(?<=IOPS=)[^,]*')
         bw=$(echo $iops_line_text | sed -n 's/[^(]*(\([0-9.]\+\)\([^)]*\)).*/\1/p')
         bw_unit=$(echo $iops_line_text | sed -n 's/[^(]*([0-9.]\+\([^)]*\)).*/\1/p')
         unit=$(echo $lat_line_text | grep -oP 'lat \(\K[^)]+')
-        lat=$(echo $lat_line_text | grep -oP '(?<=avg=)\d+(?:\.\d+)?(?=,)')
+        lat=$(echo $lat_line_text | grep -oP '(?<=avg=)[^,]*')
         qos_lat_line_num=$((iops_line_num + 8))
         qos_lat_line_text=$(sed -n "${qos_lat_line_num}p" $result_file) 
         qos_99=$(echo $qos_lat_line_text | grep -oP '99\.0000000th=\[\s*\K\d+')
@@ -143,11 +165,11 @@ function collect_fio_result()
         iops_line_num=$(cat $result_file | grep -En 'write:' | cut -d: -f1)
         lat_line_num=$((iops_line_num + 3))
         lat_line_text=$(sed -n "${lat_line_num}p" $result_file)
-        iops=$(echo $iops_line_text | grep -oP 'IOPS=\K[\d\.]+(?=k)')
+        iops=$(echo $iops_line_text | grep -oP '(?<=IOPS=)[^,]*')
         bw=$(echo $iops_line_text | sed -n 's/[^(]*(\([0-9.]\+\)\([^)]*\)).*/\1/p')
         bw_unit=$(echo $iops_line_text | sed -n 's/[^(]*([0-9.]\+\([^)]*\)).*/\1/p')
         unit=$(echo $lat_line_text | grep -oP 'lat \(\K[^)]+')
-        lat=$(echo $lat_line_text | grep -oP '(?<=avg=)\d+(?:\.\d+)?(?=,)')
+        lat=$(echo $lat_line_text | grep -oP '(?<=avg=)[^,]*')
         qos_lat_line_num=$((iops_line_num + 8))
         qos_lat_line_text=$(sed -n "${qos_lat_line_num}p" $result_file) 
         qos_99=$(echo $qos_lat_line_text | grep -oP '99\.0000000th=\[\s*\K\d+')
@@ -171,27 +193,27 @@ function check_PCIe_status(){
 
     local address=$(cat /sys/class/nvme/${controller}/address)
     if [[ -z "$address" ]]; then
-        echo "Error: can not found pcie address at $address"
+        print_log "[Error] Can not found pcie address at $address"
         return 1
     fi
     
     lspci_output=$(lspci -s "$address" -vvv 2>/dev/null)
     if [[ -z "$lspci_output" ]]; then
-        echo "Error: can not query pcie info for ${controller} $address"
+        print_log "[Error] Can not query pcie info for ${controller} $address"
         return 1
     fi
     
     local value_error=0
     maxpayload_result=$(grep "MaxReadReq" <<< "$lspci_output")
     if ! grep -q "MaxPayload 512 bytes" <<< "$maxpayload_result"; then
-        echo "Warning: ${device}(${address}), maxPayload is not 512 bytes, may drop performance. Current: $(grep "MaxPayload" <<< "$maxpayload_result" | sed -e 's/^[[:space:]]*//')"
+        print_log "[Warning] ${device}(${address}), maxPayload is not 512 bytes, may drop performance. Current: $(grep "MaxPayload" <<< "$maxpayload_result" | sed -e 's/^[[:space:]]*//')"
         value_error=$((value_error+1))
     fi
 
     lnksta_result=$(grep "LnkSta:" <<< "$lspci_output" | head -1)
     if ! grep -q "Speed 32GT/s, Width x4" <<< "$lnksta_result"; then
         lnksta_result=$(echo "$lnksta_result" | sed -E 's/^[[:space:]]*//; s/, [^,]*$//; s/, *$//')
-        echo "Warning: ${device}(${address}), PCIe speed or width is not expected, Speed 32GT/s and Width x4 are expected, but actually $lnksta_result"
+        print_log "[Warning] ${device}(${address}), PCIe speed or width is not expected, Speed 32GT/s and Width x4 are expected, but actually $lnksta_result"
         value_error=$((value_error+1))
     fi
 

@@ -21,7 +21,7 @@ skip_check=${skip_check:-0}
 ramp_time=${ramp_time:-60}
 
 usage() {
-    echo "Usage: $0 -d \"disk1 disk2 ...\" -t runtime [-c comp_ratio] [-b \"cpus1 cpus2 ...\"] [-f] [-o result_name]"
+    echo "Usage: $0 -d \"nvme0n1 nvme1n1 ...\" -t runtime [-c comp_ratio] [-b \"cpus1 cpus2 ...\"] [-f] [-o result_name]"
     echo "Options:"
     echo "  -d  Specify NVMe device names (required, space-separated, e.g. \"nvme0n1 nvme1n1\")"
     echo "  -c  Compression ratio (default: 0)"
@@ -116,6 +116,7 @@ test_log=${output_dir}/run_test.log
 result_csv_log=${result_dir}/result.csv
 collect_test_config $test_log "${disks[*]}" $comp_ratio $runtime $ramp_time $skip_check "${cpus_allowed_list[*]}" 
 collect_sys_info $sys_info_log
+export test_log=$test_log
 
 if [ "${comp_ratio}" != "" ]; 
 then
@@ -127,7 +128,7 @@ fi
 # Device status check loop
 error_flag=0
 for ((i=0; i<$disks_length; i++)); do
-    collect_drv_before_info ${disks[$i]}
+    collect_drv_before_info ${disks[$i]} $drv_info
     
     # if set check, skip status check
     if [[ "${skip_check}" != "1" ]]; then
@@ -141,7 +142,7 @@ wait
 
 if (( $error_flag != 0 )); then
     while true; do
-        read -p "Warning: Do you still continue to proceed? (yes/no): " user_input
+        read -p "[Warning] Do you still continue to proceed? (yes/no): " user_input
         
         user_input=$(echo "$user_input" | tr '[:upper:]' '[:lower:]')
         
@@ -162,149 +163,150 @@ fi
 function Run_test(){
     disk=$1
     cpus_allowed_set=$2
+    start_monitor $disk $drv_info
 
     #format
-    echo "[`date`] [${disk}] Format Start" >> ${test_log}
+    print_log "[${disk}] Format Start" 
     sudo nvme format /dev/${disk} -s 1 > /dev/null
-    echo "[`date`] [${disk}] Format End" >> ${test_log}
+    print_log "[${disk}] Format End" 
 
     #Seq write precondition
     mode="precondition";rw="write";bs=128k;job=1;qd=128;rwmixread=0;loops=1;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" 
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid"
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --loops=$loops ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" 
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Seq write 
     mode="perf";rw="write";bs=128k;job=1;qd=128;rwmixread=0;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" 
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" 
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Seq read 
     mode="perf";rw="read";bs=128k;job=1;qd=128;rwmixread=0;
-    echo "[`date`] [${disk}] ${mode} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${bs} ${job}job ${qd}qd Start" 
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${bs} ${job}job ${qd}qd End" 
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Latency Seq write 
     mode="latency";rw="write";bs=4k;job=1;qd=1;rwmixread=0;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start"
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End"
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Latency Seq read 
     mode="latency";rw="read";bs=4k;job=1;qd=1;rwmixread=0;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start"
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End"
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Random write precondition
     mode="precondition";rw="randwrite";bs=4k;job=1;qd=128;rwmixread=0;loops=2;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start"
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --loops=$loops ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End"
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
     
     #Random write
     mode="perf";rw="randwrite";bs=4k;job=4;qd=64;rwmixread=0;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start"
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End"
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Latency random write
     mode="latency";rw="randwrite";bs=4k;job=1;qd=1;rwmixread=0;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start"
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End"
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Random mix
     mode="perf";rw="randrw";bs=4k;job=4;qd=64;rwmixread=70;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start"
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --rwmixread=${rwmixread} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End"
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Random read
     mode="perf";rw="randread";bs=4k;job=8;qd=128;rwmixread=0;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start"
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End"
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
     #Latency random read
     mode="latency";rw="randread";bs=4k;job=1;qd=1;rwmixread=0;
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd Start"
     iostat -xmdct $disk 1 > ${iostat_dir}/${disk}_iostat_${mode}_${rw}_${bs}_${job}job_QD${qd}.log &
-    iostat_pid=$!
+    iostat_pid=$!;disown "$iostat_pid" 
     sudo fio --percentile_list=10:20:30:40:50:60:70:80:90:99:99.9:99.99:99.999:99.9999:99.99999:99.999999:99.9999999 --ioengine=libaio --direct=1 --norandommap \
     --randrepeat=0 --log_avg_msec=1000 --group_reporting --buffer_compress_percentage=$comp_ratio --buffer_compress_chunk=4k --filename=/dev/$disk \
     --name=${mode}_${rw}_${bs}_${job}job_QD${qd} --rw=${rw} --bs=${bs} --numjobs=${job} --iodepth=${qd} --ramp_time=$ramp_time --time_based --runtime=$runtime ${cpus_allowed_set} > ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log
     kill $iostat_pid > /dev/null
-    echo "[`date`] [${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End" >> ${test_log}
+    print_log "[${disk}] ${mode} ${rw} ${bs} ${job}job ${qd}qd End"
     collect_fio_result ${result_dir}/${disk}_${mode}_${rw}_${bs}_${job}job_${qd}qd.log $result_csv_log $disk $comp_ratio $mode
 
-    collect_drv_after_info ${disk}
-    echo "[`date`] [${disk}] Test End" >> ${test_log}
+    kill_monitor ${disk} $drv_info
+    print_log "[${disk}] Test End"
 }
 
-echo -e "Spec test is running, see ${test_log}"
+print_log "Spec test is running, see log at ${test_log}"
 
 # main test loop
 for ((i=0; i<$disks_length; i++)); do
@@ -318,4 +320,4 @@ for ((i=0; i<$disks_length; i++)); do
 done
 
 wait
-echo -e "Spec test is done, see result at ${output_dir}"
+print_log "Spec test is done, see result at ${output_dir}"
